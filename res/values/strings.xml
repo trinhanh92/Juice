@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">Juice</string>
+    <string name="hello_world">Hello world!</string>
+    <string name="action_settings">Settings</string>
+    
+    <string name="juice_loading">Loading</string>
+    <string name="give_me_charge">Give me Charge</string>
+    <string name="charing_station_everywhere">CHARGING STATIONS EVERYWHERE</string>
+    <string name="scan">SCAN</string>
+    <string name="at_the_counter">At the Counter</string>
+    <string name="charge">CHARGE</string>
+    <string name="count_down_timer">00m 00s</string>
+    <string name="charging_info">Till next scan</string>
+    <string name="power_connection_info">Please Connect Your Power Cable</string>
+    
+    <string name="action_search">Search Place</string>
+    <string name="MAPS_API_KEY">AIzaSyCvE4oN3AQkbrRgaCFbmsIcEYuOAB_-DWQ</string>
+    <string name="APP_FACEBOOK_ID">972265099452778</string>
+
+</resources>
