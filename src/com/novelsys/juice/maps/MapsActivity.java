@@ -12,6 +12,12 @@ import java.util.List;
 
 import org.json.JSONObject;
 
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GooglePlayServicesUtil;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.GoogleApiClient.ConnectionCallbacks;
+import com.google.android.gms.common.api.GoogleApiClient.OnConnectionFailedListener;
+import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.GoogleMap.OnMapLongClickListener;
@@ -28,22 +34,29 @@ import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.net.Uri;
+import android.net.wifi.WifiManager;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.support.v4.app.FragmentActivity;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.Toast;
 import android.app.Activity;
+import android.content.Context;
+import android.content.Intent;
 import android.graphics.Color;
 
 public class MapsActivity extends Activity implements LocationListener {
+	private final String TAG = MapsActivity.class.getSimpleName();
 	private GoogleMap mGoogleMap;
+	private GPSTracker mGPSTracker;
 	private ArrayList<LatLng> mMarkerPoints = new ArrayList<LatLng>();
-	private GPSTracker gps = new GPSTracker(this, mGoogleMap);
 	private double mLatitude = 0;
 	private double mLongitude = 0;
+	Location myLocation;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -54,31 +67,20 @@ public class MapsActivity extends Activity implements LocationListener {
 			initilizeMap();
 		} catch (Exception e) {
 		}
+		mGPSTracker = new GPSTracker(MapsActivity.this, mGoogleMap);
 
+		if (mGPSTracker.canGetLocation()) {
+			myLocation = mGPSTracker.getLocation();
+		} else {
+			mGPSTracker.showSettingsAlert();
+		}
+		if (myLocation != null) {
+			onLocationChanged(myLocation);
+		}
+		init_location();
 		mGoogleMap.setMyLocationEnabled(true); // false to disable
 		// enable get current location button
 		mGoogleMap.getUiSettings().setMyLocationButtonEnabled(true);
-		
-		if (gps.canGetLocation()) {
-
-		} else {
-			gps.showSettingsAlert();
-		}
-
-		LocationManager locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
-		Criteria criteria = new Criteria();
-
-		// Getting the name of the best provider
-		String provider = locationManager.getBestProvider(criteria, true);
-
-		// Getting Current Location From GPS
-		Location location = locationManager.getLastKnownLocation(provider);
-
-		if (location != null) {
-			onLocationChanged(location);
-		}
-
-		locationManager.requestLocationUpdates(provider, 20000, 0, this);
 
 		mGoogleMap.setOnMapLongClickListener(new OnMapLongClickListener() {
 
@@ -116,8 +118,13 @@ public class MapsActivity extends Activity implements LocationListener {
 
 			@Override
 			public boolean onMarkerClick(Marker mMarkerPoint) {
-				Toast.makeText(getApplicationContext(), mMarkerPoint.getId(),
-						Toast.LENGTH_SHORT).show();
+				LatLng myPos  = new LatLng(myLocation.getLatitude(), myLocation.getLongitude());
+				String url = getDirectionsUrl(myPos, mMarkerPoint.getPosition());
+
+				DownloadTask downloadTask = new DownloadTask();
+
+				// Start downloading json data from Google Directions API
+				downloadTask.execute(url);
 				return false;
 			}
 		});
@@ -148,12 +155,13 @@ public class MapsActivity extends Activity implements LocationListener {
 	}
 
 	/**
-	 * function to load map
-	 * */
+	 * @brief: Function to load map
+	 */
 	private void initilizeMap() {
 		if (mGoogleMap == null) {
 			mGoogleMap = ((MapFragment) getFragmentManager().findFragmentById(
 					R.id.map_view)).getMap();
+
 			// check map if it is created successfully or not
 			if (mGoogleMap == null) {
 				Toast.makeText(getApplicationContext(),
@@ -163,6 +171,28 @@ public class MapsActivity extends Activity implements LocationListener {
 		}
 	}
 
+	/**
+	 * @brief function to initialize some locations
+	 */
+	private void init_location() {
+		double location_arr[][] = { { 10.849151, 106.650880 },
+				{ 10.842168, 106.642420 }, { 10.848532, 106.658041 },
+				{ 10.842589, 106.660960 }, { 10.846720, 106.662290 } };
+		double mLat, mLong;
+		for (int i = 0; i < location_arr.length; i++) {
+			mLat = location_arr[i][0];
+			mLong = location_arr[i][1];
+			Marker mMarker = mGoogleMap.addMarker(new MarkerOptions()
+					.position(new LatLng(mLat, mLong)));
+		}
+	}
+
+	/**
+	 * @brief
+	 * @param origin
+	 * @param dest
+	 * @return
+	 */
 	private String getDirectionsUrl(LatLng origin, LatLng dest) {
 
 		// Origin of route
@@ -174,7 +204,7 @@ public class MapsActivity extends Activity implements LocationListener {
 
 		// Sensor enabled
 		String sensor = "sensor=true";
-		
+
 		// Building the parameters to the web service
 		String parameters = str_origin + "&" + str_dest + "&" + sensor;
 
@@ -318,7 +348,7 @@ public class MapsActivity extends Activity implements LocationListener {
 						duration = (String) point.get("duration");
 						continue;
 					}
-					
+
 					double lat = Double.parseDouble(point.get("lat"));
 					double lng = Double.parseDouble(point.get("lng"));
 
@@ -366,27 +396,6 @@ public class MapsActivity extends Activity implements LocationListener {
 		// Add new marker to the Google Map Android API V2
 		mGoogleMap.addMarker(options);
 	}
-
-	/**
-	 * Detect internet connection
-	 * 
-	 * @return
-	 */
-//	private boolean isInternetConnecting() {
-//		ConnectivityManager connectivity = (ConnectivityManager) this
-//				.getSystemService(Context.CONNECTIVITY_SERVICE);
-//		if (connectivity != null) {
-//			NetworkInfo[] info = connectivity.getAllNetworkInfo();
-//			if (info != null) {
-//				for (int i = 0; i < info.length; i++) {
-//					if (info[i].getState() == NetworkInfo.State.CONNECTED) {
-//						return true;
-//					}
-//				}
-//			}
-//		}
-//		return false;
-//	}
 
 	@Override
 	public void onLocationChanged(Location location) {
